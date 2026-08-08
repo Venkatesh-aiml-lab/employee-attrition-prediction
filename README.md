@@ -2,13 +2,24 @@
 
 ## 📌 Project Overview
 
-Employee attrition is an important HR challenge because employee turnover can increase recruitment costs, affect productivity, and impact team performance.
+Employee attrition is a significant HR challenge because employee turnover can increase recruitment costs, affect productivity, and impact workforce planning.
 
-The objective of this project is to analyze employee-related factors and build machine learning models that can help the HR team understand **why employees may leave the organization** and identify employees who may be at higher risk of attrition.
+The objective of this project is to analyze employee-related factors associated with attrition and build machine learning classification models that can help identify employees who may be at higher risk of leaving the organization.
 
-This project covers data exploration, preprocessing, feature analysis, model building, and model evaluation.
+This project covers:
 
-> **Note:** This is the initial version of the project. Further improvements to preprocessing, class-imbalance handling, model optimization, and deployment/monitoring are planned for upcoming versions.
+- Exploratory Data Analysis (EDA)
+- Data preprocessing
+- Feature engineering and feature selection
+- Machine learning model development
+- Stratified cross-validation
+- Independent test-set evaluation
+- Model comparison
+- MLflow experiment tracking
+- MLflow model logging and registration
+- Champion model aliasing
+
+> **Project Version:** Final working version of the current implementation.
 
 ---
 
@@ -16,272 +27,640 @@ This project covers data exploration, preprocessing, feature analysis, model bui
 
 The HR team wants to answer two key questions:
 
-1. **Why are employees leaving the organization?**
-2. **Can machine learning help identify employees who are more likely to leave?**
+1. **What employee-related factors are associated with attrition?**
+2. **Can machine learning predict whether an employee is likely to leave the organization?**
 
-The project uses historical employee data to identify patterns associated with attrition and evaluates classification models for predicting employee attrition.
+The project uses historical employee data to identify patterns in employee attrition and evaluate multiple classification algorithms.
+
+The model is intended as a **decision-support tool** for HR analysis and retention planning, not as an automatic basis for employment decisions.
 
 ---
 
-## 📂 Project Structure
+## 📊 Dataset
+
+The dataset contains:
+
+- **1,470 employee records**
+- **35 features**
+- Target variable: `Attrition`
+
+Target values:
+
+| Value | Meaning |
+|---|---|
+| `No` | Employee stayed with the organization |
+| `Yes` | Employee left the organization |
+
+The target variable is imbalanced:
+
+| Class | Approx. Distribution |
+|---|---:|
+| No | 83.87% |
+| Yes | 16.13% |
+
+Because attrition is an imbalanced classification problem, the project evaluates multiple metrics instead of relying only on accuracy.
+
+---
+
+## 🔎 Exploratory Data Analysis
+
+The EDA includes:
+
+- Dataset shape and structure
+- Data types
+- Missing-value analysis
+- Duplicate-record analysis
+- Unique-value analysis
+- Numerical and categorical feature analysis
+- Target-class distribution
+- Distribution analysis
+- Correlation analysis
+- Correlation heatmaps
+- Outlier analysis using the IQR method
+- Skewness analysis
+- Visualization of selected feature distributions
+
+### Key EDA observations
+
+- The dataset contains 1,470 rows and 35 columns.
+- No missing values were identified.
+- No duplicate records were identified.
+- The target variable is imbalanced.
+- `StandardHours`, `Over18`, and `EmployeeCount` contain constant values and do not contribute useful predictive information.
+- Several numerical features show skewness and potential outliers.
+
+---
+
+## 🛠️ Data Preprocessing
+
+The current implementation includes the following preprocessing steps:
+
+### 1. Removing non-informative features
+
+The following features are removed because they contain constant or non-predictive information:
 
 ```text
-employee_attrision_predictions/
+EmployeeNumber
+Over18
+StandardHours
+EmployeeCount
+```
+
+### 2. Target encoding
+
+The target variable is converted from:
+
+```text
+No → 0
+Yes → 1
+```
+
+### 3. Binary categorical encoding
+
+`Gender` and `OverTime` are label encoded.
+
+### 4. One-hot encoding
+
+The following categorical features are one-hot encoded:
+
+```text
+BusinessTravel
+Department
+EducationField
+JobRole
+MaritalStatus
+```
+
+The encoder uses:
+
+- `drop="first"`
+- `handle_unknown="ignore"`
+
+### 5. Yeo-Johnson transformation
+
+Yeo-Johnson transformation is applied to selected skewed numerical features, including:
+
+```text
+DistanceFromHome
+MonthlyIncome
+JobLevel
+PerformanceRating
+NumCompaniesWorked
+TotalWorkingYears
+YearsAtCompany
+YearsSinceLastPromotion
+YearsWithCurrManager
+```
+
+### 6. Mutual Information feature selection
+
+`mutual_info_classif` is used to calculate the relationship between input features and the target.
+
+Features with mutual information greater than zero are selected for modeling.
+
+---
+
+## 🔬 Train / Validation / Test Strategy
+
+The project uses a stratified train/test split:
+
+```text
+80% → Training
+20% → Independent Test
+```
+
+```python
+train_test_split(
+    X_selected,
+    y,
+    test_size=0.2,
+    random_state=50,
+    stratify=y
+)
+```
+
+The training data is further evaluated using **5-fold Stratified Cross-Validation**.
+
+### Validation strategy
+
+```text
+Full Dataset
+     │
+     ├── 80% Training Data
+     │      │
+     │      └── 5-Fold Stratified Cross-Validation
+     │
+     └── 20% Independent Test Data
+```
+
+The independent test set is kept separate from the cross-validation process and is used for final model evaluation.
+
+---
+
+## 🤖 Machine Learning Models
+
+Three classification algorithms are evaluated.
+
+### 1. Logistic Regression
+
+Used as a baseline classification model.
+
+Configuration:
+
+```text
+max_iter = 10000
+```
+
+### 2. Random Forest
+
+An ensemble tree-based classification model.
+
+Configuration:
+
+```text
+n_estimators = 100
+max_depth = 6
+random_state = 50
+```
+
+### 3. XGBoost
+
+A gradient-boosting classification model.
+
+Configuration:
+
+```text
+n_estimators = 100
+learning_rate = 0.1
+max_depth = 6
+random_state = 50
+eval_metric = "auc"
+```
+
+---
+
+## 📈 Model Evaluation
+
+The models are evaluated using:
+
+- Validation Accuracy
+- Validation ROC-AUC
+- Test Accuracy
+- Test Precision
+- Test Recall
+- Test F1-score
+- Test ROC-AUC
+- Confusion Matrix
+- ROC Curves
+
+### Current Results
+
+| Model | CV Accuracy | CV AUC | Test Accuracy | Test Precision | Test Recall | Test F1 | Test AUC |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Logistic Regression | 86.57% | 0.807 | 86.73% | 0.70 | 0.418 | 0.418 | **0.807** |
+| Random Forest | 85.29% | 0.768 | 87.07% | 1.00 | 0.191 | 0.321 | 0.795 |
+| XGBoost | 85.97% | 0.760 | **87.42%** | 0.75 | 0.319 | **0.448** | 0.787 |
+
+### Current model selection
+
+The project selects the model with the highest **test accuracy** for the MLflow Model Registry.
+
+Based on the current results:
+
+**XGBoost is the selected model with a test accuracy of 87.42%.**
+
+The model comparison and evaluation artifacts are logged to MLflow for reproducibility.
+
+> Note: Because the target is imbalanced, model selection based only on accuracy has limitations. Recall, F1-score and ROC-AUC should also be considered when the business priority is identifying employees at risk of attrition.
+
+---
+
+## 📊 Model Visualizations
+
+The project generates and logs visualizations including:
+
+- Confusion matrices
+- ROC curves
+- Feature-importance plots
+- Model accuracy comparison
+- Model AUC comparison
+- Combined ROC comparison
+- Mutual Information feature scores
+
+These artifacts are available through the MLflow experiment tracking workflow.
+
+---
+
+# 🔬 MLflow Integration
+
+MLflow is used to track experiments, metrics, parameters, artifacts, and trained models.
+
+### MLflow Experiment
+
+```text
+employee_attrition
+```
+
+### Models logged
+
+```text
+Logistic Regression
+Random Forest
+XGBoost
+```
+
+### Metrics logged
+
+For each model, MLflow tracks:
+
+- Validation accuracy mean
+- Validation accuracy standard deviation
+- Validation AUC mean
+- Validation AUC standard deviation
+- Test accuracy
+- Test precision
+- Test recall
+- Test F1-score
+- Test AUC
+
+### Artifacts logged
+
+Examples include:
+
+```text
+ROC curves
+Confusion matrices
+Feature-importance plots
+Model comparison CSV
+```
+
+---
+
+## 🗂️ MLflow Model Registry
+
+The best-performing model based on the configured selection metric is registered using the model name:
+
+```text
+Best_Attrition_Prediction_Model
+```
+
+The selected model is assigned the alias:
+
+```text
+champion
+```
+
+The registry workflow includes:
+
+1. Searching MLflow experiment runs
+2. Comparing model test accuracy
+3. Identifying the best model run
+4. Finding the corresponding logged model
+5. Registering the model
+6. Adding model-version tags
+7. Assigning the `champion` alias
+8. Loading the champion model for verification
+9. Generating sample predictions
+
+---
+
+## ☁️ Google Colab and MLflow Dashboard
+
+The project is designed to run in **Google Colab**.
+
+The notebook:
+
+- Installs MLflow, pyngrok, and XGBoost
+- Starts an MLflow tracking server
+- Uses SQLite as the MLflow backend store
+- Stores MLflow artifacts
+- Creates an ngrok tunnel
+- Provides a public MLflow dashboard URL for the current Colab runtime
+
+The MLflow dashboard URL is generated dynamically when the notebook runs.
+
+> The ngrok authentication token is requested securely at runtime and is not stored in the notebook source code.
+
+### Important
+
+The MLflow dashboard URL is temporary and depends on the active Colab runtime. The Colab runtime must remain active while using the dashboard.
+
+---
+
+## 📁 Project Structure
+
+```text
+employee-attrition-prediction/
 │
 ├── code/
-│   ├── employee_attrition_v1.ipynb
-│   └── employee_attrition_v1.py
+│   ├── employee_attrition.ipynb
+│   └── employee_attrition.py
 │
 ├── data/
 │   └── data_employee_attrition.csv
 │
 ├── documents/
 │   ├── requirements.docx
-│   └── Solution flow for Employee Attrition.drawio
+│   ├── Solution flow for Employee Attrition.drawio
+│   └── Employee_Attrition_MLflow_Issues_and_Resolutions.docx
 │
+├── artifacts/
+│   ├── mlflow_registry_v1.png
+│   ├── mlflow_runs.png
+│   ├── mlflow_model_xgboost.png
+│   ├── mlflow_model_registry.png
+│   └── mlflow_models.png
+│
+├── mlflow_plots/
+│   ├── logistic_regression_confusion_matrix.png
+│   ├── logistic_regression_roc.png
+│   ├── random_forest_confusion_matrix.png
+│   ├── random_forest_feature_importance.png
+│   ├── xgboost_confusion_matrix.png
+│   ├── xgboost_feature_importance.png
+│   └── model_comparison.csv
+│
+├── .gitignore
 └── README.md
 ```
 
-### Folder Description
+### Directory Description
 
-| Folder/File | Description |
+| Directory/File | Purpose |
 |---|---|
-| `code/` | Jupyter Notebook and Python source code |
-| `data/` | Employee attrition dataset used for analysis and modeling |
-| `documents/` | Project requirements and solution flow diagram |
-| `employee_attrition_v1.ipynb` | Complete exploratory analysis and ML workflow |
-| `employee_attrition_v1.py` | Python version of the project code |
+| `code/` | Main notebook and Python implementation |
+| `data/` | Employee attrition dataset |
+| `documents/` | Requirements, solution flow and MLflow troubleshooting documentation |
+| `artifacts/` | MLflow-related screenshots and registry evidence |
+| `mlflow_plots/` | Model evaluation visualizations and comparison results |
+| `.gitignore` | Prevents temporary files, environments and MLflow local artifacts from being committed |
 | `README.md` | Project documentation |
 
----
-
-## 📊 Dataset
-
-The dataset contains **1,470 employee records and 35 features**.
-
-The target variable is:
-
-- `Attrition`
-  - `Yes` — employee left the organization
-  - `No` — employee stayed with the organization
-
-The target distribution is approximately:
-
-- **No:** 83.88%
-- **Yes:** 16.12%
-
-This indicates that the target variable is **imbalanced**, which is an important consideration when evaluating classification models.
-
----
-
-## 🔎 Exploratory Data Analysis
-
-The project performs exploratory data analysis to understand:
-
-- Dataset structure and data types
-- Missing values
-- Duplicate records
-- Numerical and categorical features
-- Target-variable distribution
-- Statistical characteristics of numerical variables
-- Relationships between features
-- Feature importance/relevance
-- Potential outliers
-- Factors associated with employee attrition
-
-The analysis is intended to provide HR-oriented insights into the characteristics associated with employee turnover.
-
----
-
-## 🛠️ Data Preprocessing
-
-The current version includes preprocessing steps such as:
-
-- Removing unnecessary columns
-- Handling categorical variables
-- Encoding categorical features
-- Numerical feature transformation
-- Feature analysis
-- Preparing data for machine learning
-- Train/test data preparation
-
-The preprocessing pipeline will be further refined in future versions.
-
----
-
-## 🤖 Machine Learning Models
-
-The following classification algorithms were evaluated:
-
-### 1. Logistic Regression
-
-Used as a baseline classification model and to understand the relationship between employee features and attrition.
-
-### 2. Random Forest
-
-An ensemble tree-based model used to capture nonlinear relationships between employee characteristics and attrition.
-
-### 3. XGBoost
-
-A gradient-boosting algorithm evaluated for its ability to model complex relationships in the employee data.
-
----
-
-## 📈 Model Evaluation
-
-The models were evaluated using classification metrics including:
-
-- Accuracy
-- ROC-AUC
-- Confusion Matrix
-- Classification Report
-- ROC Curve
-
-Current results:
-
-| Model | Accuracy | ROC-AUC |
-|---|---:|---:|
-| Logistic Regression | 88.10% | 0.806 |
-| Random Forest | 86.39% | **0.826** |
-| XGBoost | 86.73% | 0.799 |
-
-Based on ROC-AUC in the current version, **Random Forest performed best among the evaluated models**.
-
-Because employee attrition is an imbalanced classification problem, future versions will place greater emphasis on recall, precision, F1-score, ROC-AUC, and other appropriate evaluation approaches rather than relying primarily on accuracy.
-
----
-
-## 💡 Business Interpretation
-
-The purpose of this project is not simply to predict attrition.
-
-The broader objective is to help HR understand patterns that may be associated with employee turnover.
-
-Potential applications include:
-
-- Identifying employees at higher attrition risk
-- Understanding important employee-related factors
-- Supporting employee-retention strategies
-- Helping HR prioritize further investigation
-- Supporting data-driven workforce planning
-
-The model output should be treated as a **decision-support tool**, not as an automatic basis for employment decisions.
-
----
-
-## 🔄 Current Project Workflow
-
-```text
-Employee Data
-      ↓
-Data Understanding
-      ↓
-Data Cleaning & Preprocessing
-      ↓
-Exploratory Data Analysis
-      ↓
-Feature Analysis
-      ↓
-Train / Test Split
-      ↓
-Model Training
-      ↓
-Logistic Regression
-Random Forest
-XGBoost
-      ↓
-Model Evaluation
-      ↓
-Compare Model Performance
-      ↓
-Identify Better Performing Model
-```
+> The local `mlflow.db` database and `mlartifacts/` directory are runtime-generated MLflow files and are excluded by `.gitignore`.
 
 ---
 
 ## 🧰 Technologies Used
 
+### Programming
+
 - Python
+
+### Data Analysis
+
 - Pandas
 - NumPy
+
+### Visualization
+
 - Matplotlib
 - Seaborn
+
+### Machine Learning
+
 - Scikit-learn
 - XGBoost
-- Jupyter Notebook / Google Colab
+
+### Experiment Tracking / MLOps
+
+- MLflow
+- MLflow Model Registry
+- pyngrok
+
+### Development Environment
+
+- Google Colab
+- Jupyter Notebook
+- Git
+- GitHub
+
+### Documentation / Design
+
 - Draw.io
 
 ---
 
-## ▶️ How to Run the Project
+## ▶️ How to Run
 
-### Option 1: Jupyter Notebook / Google Colab
+### Option 1 — Google Colab
 
-1. Clone or download this repository.
+1. Clone or download the repository.
 2. Open:
 
 ```text
-code/employee_attrition_v1.ipynb
+code/employee_attrition.ipynb
 ```
 
-3. Upload or place the dataset in the expected data location.
-4. Install the required Python libraries.
-5. Run the notebook cells sequentially.
+3. Open the notebook in Google Colab.
+4. Install the required packages by running the setup cells.
+5. Provide the required ngrok authentication token when prompted.
+6. Make sure the dataset is available at the path expected by the notebook.
+7. Run the notebook cells sequentially.
+8. Open the MLflow dashboard URL printed by the notebook.
 
-### Option 2: Python Script
+### Option 2 — Python Script
 
-Run:
+The project also contains:
 
-```bash
-python code/employee_attrition_v1.py
+```text
+code/employee_attrition.py
 ```
 
-Make sure the required Python dependencies are installed before execution.
+The Python script contains the core implementation of the project.
+
+The MLflow/Google Colab configuration in the current implementation is designed around the Colab environment, so local execution may require path and environment adjustments.
 
 ---
 
 ## 📦 Requirements
 
-The required packages are documented in:
+The project requirements are documented in:
 
 ```text
 documents/requirements.docx
 ```
 
-A dedicated `requirements.txt` file will be added in a future version.
+The MLflow experiment environment also records model-specific dependency information as part of the logged model artifacts.
+
+---
+
+## 🔄 End-to-End Workflow
+
+```text
+Employee Dataset
+       │
+       ▼
+Data Understanding
+       │
+       ▼
+Data Quality Checks
+       │
+       ├── Missing Values
+       ├── Duplicate Records
+       ├── Unique Values
+       └── Target Distribution
+       │
+       ▼
+Exploratory Data Analysis
+       │
+       ├── Univariate Analysis
+       ├── Bivariate Analysis
+       ├── Correlation Analysis
+       ├── Outlier Analysis
+       └── Skewness Analysis
+       │
+       ▼
+Feature Engineering
+       │
+       ├── Remove Non-informative Features
+       ├── Encode Categorical Features
+       ├── Yeo-Johnson Transformation
+       └── Mutual Information Selection
+       │
+       ▼
+Train / Test Split
+       │
+       ├── 80% Training
+       │      └── 5-Fold Stratified CV
+       │
+       └── 20% Independent Test
+       │
+       ▼
+Model Training
+       │
+       ├── Logistic Regression
+       ├── Random Forest
+       └── XGBoost
+       │
+       ▼
+Model Evaluation
+       │
+       ├── Accuracy
+       ├── Precision
+       ├── Recall
+       ├── F1
+       ├── ROC-AUC
+       ├── Confusion Matrix
+       └── ROC Curves
+       │
+       ▼
+Model Comparison
+       │
+       ▼
+Best Model Selection
+       │
+       ▼
+MLflow Tracking
+       │
+       ├── Parameters
+       ├── Metrics
+       ├── Artifacts
+       └── Logged Models
+       │
+       ▼
+MLflow Model Registry
+       │
+       └── Best_Attrition_Prediction_Model
+                    │
+                    ▼
+               champion Alias
+```
+
+---
+
+## 💡 Business Use Cases
+
+The project can support HR teams in:
+
+- Identifying patterns associated with employee attrition
+- Understanding factors related to employee turnover
+- Identifying employees who may require further retention analysis
+- Supporting workforce planning
+- Prioritizing employee-retention initiatives
+- Providing data-driven insights for HR analysis
+
+The predictions should be combined with appropriate HR processes and human judgment.
 
 ---
 
 ## 🚀 Future Improvements
 
-The project is currently **Version 1**. Planned improvements include:
+Potential future improvements include:
 
-- Better handling of class imbalance
-- Improved preprocessing pipeline
-- Prevention of data leakage
+- Addressing class imbalance using appropriate techniques
+- Building a complete preprocessing pipeline
+- Moving preprocessing and feature selection inside the cross-validation pipeline
 - Hyperparameter tuning
-- Cross-validation
-- Feature engineering
-- Improved feature selection
-- Threshold optimization
-- Model explainability
-- SHAP-based feature interpretation
-- MLflow experiment tracking
-- Model versioning
-- Model deployment
-- API integration
+- Threshold optimization for attrition-risk prediction
+- Improved model selection based on business-oriented metrics
+- SHAP-based model explainability
+- Model deployment through an API
+- CI/CD integration
+- Data and model versioning
 - Model monitoring
-- Data/model drift monitoring
-- Automated retraining pipeline
+- Data drift and model drift detection
+- Automated retraining
+- Production model serving
 
 ---
 
 ## 📌 Project Status
 
-**Version:** 1.0  
-**Status:** Initial machine learning implementation
+**Status:** Final working version of the current implementation
 
-This repository represents the initial version of the Employee Attrition Prediction project. The project will evolve through subsequent versions as additional ML engineering and MLOps capabilities are implemented.
+**Domain:** Human Resources / People Analytics
+
+**Problem Type:** Binary Classification
+
+**Target:** Employee Attrition
+
+**Best Model by Current Selection Metric:** XGBoost
+
+**Current Test Accuracy:** 87.42%
+
+**MLflow Model Registry:** Implemented
+
+**Champion Model Alias:** Implemented
 
 ---
 
@@ -289,4 +668,4 @@ This repository represents the initial version of the Employee Attrition Predict
 
 **Venkatesh**
 
-This project is part of my ongoing exploration and practical work in **Machine Learning, Data Science, and MLOps**.
+This project represents practical work and continued exploration in **Machine Learning, Data Science, and MLOps**, with a focus on applying machine learning and experiment tracking to an HR analytics use case.
